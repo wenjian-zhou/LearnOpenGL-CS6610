@@ -26,6 +26,10 @@ void renderQuad();
 const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
 
+// lighting info
+    // -------------
+glm::vec3 lightPos(-2.0f, 4.0f, -1.0f);
+
 // camera
 Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
 float lastX = (float)SCR_WIDTH / 2.0;
@@ -39,7 +43,7 @@ float lastFrame = 0.0f;
 // meshes
 unsigned int planeVAO;
 
-int main()
+int main(int argc, char** argv)
 {
     // glfw: initialize and configure
     // ------------------------------
@@ -86,6 +90,11 @@ int main()
     Shader shader("3.1.3.shadow_mapping.vs", "3.1.3.shadow_mapping.fs");
     Shader simpleDepthShader("3.1.3.shadow_mapping_depth.vs", "3.1.3.shadow_mapping_depth.fs");
     Shader debugDepthQuad("3.1.3.debug_quad.vs", "3.1.3.debug_quad_depth.fs");
+    Shader lightShader("3.1.3.shadow_mapping_light.vs", "3.1.3.shadow_mapping_light.fs");
+
+    // load models
+    // -----------
+    Model ourModel(FileSystem::getPath(argv[1]));
 
     // set up vertex data (and buffer(s)) and configure vertex attributes
     // ------------------------------------------------------------------
@@ -150,10 +159,6 @@ int main()
     debugDepthQuad.use();
     debugDepthQuad.setInt("depthMap", 0);
 
-    // lighting info
-    // -------------
-    glm::vec3 lightPos(-2.0f, 4.0f, -1.0f);
-
     // render loop
     // -----------
     while (!glfwWindowShouldClose(window))
@@ -196,7 +201,18 @@ int main()
             glClear(GL_DEPTH_BUFFER_BIT);
             glActiveTexture(GL_TEXTURE0);
             glBindTexture(GL_TEXTURE_2D, woodTexture);
-            renderScene(simpleDepthShader);
+            // floor
+            glm::mat4 model = glm::mat4(1.0f);
+            simpleDepthShader.setMat4("model", model);
+            glBindVertexArray(planeVAO);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+            // teapot
+            model = glm::mat4(1.0f);
+            model = glm::translate(model, glm::vec3(0.0f, -0.5f, 0.0f));
+            model = glm::scale(model, glm::vec3(0.05f));
+            model = glm::rotate(model, glm::radians(-90.f), glm::vec3(1, 0, 0));
+            simpleDepthShader.setMat4("model", model);
+            ourModel.Draw(simpleDepthShader);
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
         // reset viewport
@@ -218,7 +234,42 @@ int main()
         glBindTexture(GL_TEXTURE_2D, woodTexture);
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D, depthMap);
-        renderScene(shader);
+        
+        // floor
+        model = glm::mat4(1.0f);
+        shader.setMat4("model", model);
+        glBindVertexArray(planeVAO);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+        // teapot
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(0.0f, -0.5f, 0.0f));
+        model = glm::scale(model, glm::vec3(0.05f));
+        model = glm::rotate(model, glm::radians(-90.f), glm::vec3(1, 0, 0));
+        shader.setMat4("model", model);
+        ourModel.Draw(shader);
+
+
+        // Display the light position
+        // --------------------------
+        float lightVertices[] = {lightPos.x, lightPos.y, lightPos.z};
+        unsigned int lightVAO, lightVBO;
+        glGenVertexArrays(1, &lightVAO);
+        glGenBuffers(1, &lightVBO);
+        glBindVertexArray(lightVAO);
+        glBindBuffer(GL_ARRAY_BUFFER, lightVBO);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(lightVertices), lightVertices, GL_STATIC_DRAW);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
+        glBindVertexArray(0);
+
+        lightShader.use();
+        lightShader.setMat4("projection", projection);
+        lightShader.setMat4("view", view);
+        model = glm::mat4(1.0f);
+        lightShader.setMat4("model", model);
+        glBindVertexArray(lightVAO);
+        glDrawArrays(GL_POINTS, 0, 1);
+
 
         // render Depth map to quad for visual debugging
         // ---------------------------------------------
@@ -253,8 +304,13 @@ void renderScene(const Shader &shader)
     shader.setMat4("model", model);
     glBindVertexArray(planeVAO);
     glDrawArrays(GL_TRIANGLES, 0, 6);
-    // cubes
+    // teapot
     model = glm::mat4(1.0f);
+    model = glm::translate(model, glm::vec3(0.0f, -0.5f, 0.0f));
+    model = glm::scale(model, glm::vec3(0.05f));
+    model = glm::rotate(model, glm::radians(-90.f), glm::vec3(1, 0, 0));
+    // cubes
+    /*model = glm::mat4(1.0f);
     model = glm::translate(model, glm::vec3(0.0f, 1.5f, 0.0));
     model = glm::scale(model, glm::vec3(0.5f));
     shader.setMat4("model", model);
@@ -269,7 +325,7 @@ void renderScene(const Shader &shader)
     model = glm::rotate(model, glm::radians(60.0f), glm::normalize(glm::vec3(1.0, 0.0, 1.0)));
     model = glm::scale(model, glm::vec3(0.25));
     shader.setMat4("model", model);
-    renderCube();
+    renderCube();*/
 }
 
 
@@ -386,14 +442,29 @@ void processInput(GLFWwindow *window)
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
 
-    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-        camera.ProcessKeyboard(FORWARD, deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-        camera.ProcessKeyboard(BACKWARD, deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-        camera.ProcessKeyboard(LEFT, deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-        camera.ProcessKeyboard(RIGHT, deltaTime);
+    float velocity = 5.0f * deltaTime;
+    if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS)
+    {
+        if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+            lightPos += glm::vec3(0.0f, 0.0f, -1.0f) * velocity;
+        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+            lightPos -= glm::vec3(0.0f, 0.0f, -1.0f) * velocity;
+        if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+            lightPos -= glm::vec3(1.0f, 0.0f, 0.0f) * velocity;
+        if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+            lightPos += glm::vec3(1.0f, 0.0f, 0.0f) * velocity;
+    }
+    else
+    {
+		if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+			camera.ProcessKeyboard(FORWARD, deltaTime);
+		if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+			camera.ProcessKeyboard(BACKWARD, deltaTime);
+		if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+			camera.ProcessKeyboard(LEFT, deltaTime);
+		if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+			camera.ProcessKeyboard(RIGHT, deltaTime);
+	}
 }
 
 // glfw: whenever the window size changed (by OS or user resize) this callback function executes

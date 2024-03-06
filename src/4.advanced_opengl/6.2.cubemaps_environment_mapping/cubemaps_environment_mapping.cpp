@@ -35,7 +35,7 @@ bool firstMouse = true;
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 
-int main()
+int main(int argc, char** argv)
 {
     // glfw: initialize and configure
     // ------------------------------
@@ -85,7 +85,7 @@ int main()
 
     // load models
     // -----------
-    Model ourModel(FileSystem::getPath("resources/objects/teapot/teapot.obj"));
+    Model ourModel(FileSystem::getPath(argv[1]));
 
     // set up vertex data (and buffer(s)) and configure vertex attributes
     // ------------------------------------------------------------------
