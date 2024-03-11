@@ -18,6 +18,10 @@ void main()
     vec2 reflectTexCoords = vec2(1.0 - ndc.x, ndc.y);
     vec4 teapotColor = texture(teapot, reflectTexCoords);
     vec4 envColor = vec4(texture(skybox, R).rgb, 1.0);
+    if (cameraPos.y < -0.5)
+    {
+        teapotColor = vec4(0.f, 0.f, 0.f, 1.f);
+    }
     vec4 result = teapotColor;
     if (teapotColor == vec4(0.f, 0.f, 0.f, 1.f))
     {
