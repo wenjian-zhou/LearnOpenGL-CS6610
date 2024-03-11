@@ -28,7 +28,7 @@ const unsigned int SCR_HEIGHT = 600;
 
 // lighting info
     // -------------
-glm::vec3 lightPos(-2.0f, 1.0f, -1.0f);
+glm::vec3 lightPos(-1.0f, 0.6f, -1.0f);
 
 // camera
 Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
