@@ -365,7 +365,7 @@ int main(int argc, char** argv)
         projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
         //model = glm::translate(model, glm::vec3(0.0f, -0.5f, 0.0f));
         //model = glm::scale(model, glm::vec3(0.05f));
-        model = glm::rotate(model, glm::radians(180.f), glm::vec3(0, 0, 1));
+        //model = glm::rotate(model, glm::radians(180.f), glm::vec3(0, 0, 1));
         shader.setMat4("model", model);
         shader.setMat4("view", view);
         shader.setMat4("projection", projection);
@@ -421,9 +421,9 @@ void processInput(GLFWwindow *window)
     if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
         inverseCam.ProcessKeyboard(BACKWARD, deltaTime);
     if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-        inverseCam.ProcessKeyboard(LEFT, deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
         inverseCam.ProcessKeyboard(RIGHT, deltaTime);
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+        inverseCam.ProcessKeyboard(LEFT, deltaTime);
 }
 
 // glfw: whenever the window size changed (by OS or user resize) this callback function executes
@@ -455,7 +455,7 @@ void mouse_callback(GLFWwindow* window, double xposIn, double yposIn)
     lastY = ypos;
 
     camera.ProcessMouseMovement(xoffset, yoffset);
-    inverseCam.ProcessMouseMovement(-xoffset, -yoffset);
+    inverseCam.ProcessMouseMovement(xoffset, -yoffset);
 }
 
 // glfw: whenever the mouse scroll wheel scrolls, this callback is called

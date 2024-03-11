@@ -15,7 +15,7 @@ void main()
     vec3 I = normalize(Position - cameraPos);
     vec3 R = reflect(I, normalize(Normal));
     vec2 ndc = (clipSpace.xy/clipSpace.w)/2.0 + 0.5;
-    vec2 reflectTexCoords = vec2(ndc.x, ndc.y);
+    vec2 reflectTexCoords = vec2(1.0 - ndc.x, ndc.y);
     vec4 teapotColor = texture(teapot, reflectTexCoords);
     vec4 envColor = vec4(texture(skybox, R).rgb, 1.0);
     vec4 result = teapotColor;
