@@ -1,0 +1,25 @@
+#version 430 core
+
+layout(vertices=4) out;
+
+uniform mat4 model;
+uniform mat4 view;
+
+in vec2 TexCoords[];
+in vec3 Normal[];
+out vec3 tcNormal[];
+out vec2 TextureCoord[];
+
+void main()
+{
+    gl_out[gl_InvocationID].gl_Position = gl_in[gl_InvocationID].gl_Position;
+    TextureCoord[gl_InvocationID] = TexCoords[gl_InvocationID];
+    tcNormal[gl_InvocationID] = Normal[gl_InvocationID];
+    gl_TessLevelOuter[0] = 16*8.0;
+    gl_TessLevelOuter[1] = 16*8.0;
+    gl_TessLevelOuter[2] = 16*8.0;
+    gl_TessLevelOuter[3] = 16*8.0;
+
+    gl_TessLevelInner[0] = 16*8.0;
+    gl_TessLevelInner[1] = 16*8.0;
+}

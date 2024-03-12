@@ -7,7 +7,7 @@
 #include <glm/gtc/type_ptr.hpp>
 
 #include <learnopengl/filesystem.h>
-#include <learnopengl/shader.h>
+#include <learnopengl/shader_t.h>
 #include <learnopengl/camera.h>
 #include <learnopengl/model.h>
 
@@ -19,10 +19,12 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void processInput(GLFWwindow *window);
 unsigned int loadTexture(const char *path);
 void renderQuad();
+void renderPlane();
 
 // settings
 const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
+bool spacePressed = false;
 
 // camera
 Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
@@ -34,13 +36,13 @@ bool firstMouse = true;
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 
-int main()
+int main(int argc, char** argv)
 {
     // glfw: initialize and configure
     // ------------------------------
     glfwInit();
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
 #ifdef __APPLE__
@@ -79,11 +81,13 @@ int main()
     // build and compile shaders
     // -------------------------
     Shader shader("4.normal_mapping.vs", "4.normal_mapping.fs");
-
+    Shader geoShader("tesselation.vs", "tesselation.fs", "tesselation.gs");
+    Shader dispShader("dis.vs", "dis.fs", nullptr, "dis.tcs", "dis.tes");
     // load textures
     // -------------
-    unsigned int diffuseMap = loadTexture(FileSystem::getPath("resources/textures/brickwall.jpg").c_str());
-    unsigned int normalMap  = loadTexture(FileSystem::getPath("resources/textures/brickwall_normal.jpg").c_str());
+    unsigned int diffuseMap = loadTexture(FileSystem::getPath("resources/textures/block.png").c_str());
+    unsigned int normalMap  = loadTexture(FileSystem::getPath("resources/textures/teapot_normal.png").c_str());
+    unsigned int displacementMap = loadTexture(FileSystem::getPath("resources/textures/teapot_disp.png").c_str());
 
     // shader configuration
     // --------------------
@@ -91,9 +95,18 @@ int main()
     shader.setInt("diffuseMap", 0);
     shader.setInt("normalMap", 1);
 
+    geoShader.use();
+    geoShader.setInt("diffuseMap", 0);
+    geoShader.setInt("normalMap", 1);
+
+    dispShader.use();
+    dispShader.setInt("normalMap", 1);
+    dispShader.setInt("heightMap", 2);
     // lighting info
     // -------------
-    glm::vec3 lightPos(0.5f, 1.0f, 0.3f);
+    glm::vec3 lightPos(0.5f, 0.0f, 0.5f);
+
+    glPatchParameteri(GL_PATCH_VERTICES, 4);
 
     // render loop
     // -----------
@@ -117,12 +130,13 @@ int main()
         // configure view/projection matrices
         glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
         glm::mat4 view = camera.GetViewMatrix();
-        shader.use();
+        
+        // render normal-mapped quad       
+        glm::mat4 model = glm::mat4(1.0f);
+        model = glm::rotate(model, glm::radians(180.f), glm::normalize(glm::vec3(0.0, 0.0, 1.0))); // rotate the quad to show normal mapping from multiple directions
+        /*shader.use();
         shader.setMat4("projection", projection);
         shader.setMat4("view", view);
-        // render normal-mapped quad
-        glm::mat4 model = glm::mat4(1.0f);
-        model = glm::rotate(model, glm::radians((float)glfwGetTime() * -10.0f), glm::normalize(glm::vec3(1.0, 0.0, 1.0))); // rotate the quad to show normal mapping from multiple directions
         shader.setMat4("model", model);
         shader.setVec3("viewPos", camera.Position);
         shader.setVec3("lightPos", lightPos);
@@ -131,13 +145,43 @@ int main()
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D, normalMap);
         renderQuad();
+        glDrawArrays(GL_TRIANGLES, 0, 6);
 
+        if (spacePressed)
+        {
+            geoShader.use();
+            geoShader.setMat4("projection", projection);
+            geoShader.setMat4("view", view);
+            geoShader.setMat4("model", model);
+            geoShader.setVec3("viewPos", camera.Position);
+            geoShader.setVec3("lightPos", lightPos);
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, diffuseMap);
+            glActiveTexture(GL_TEXTURE1);
+            glBindTexture(GL_TEXTURE_2D, normalMap);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+        }*/
+
+        // displacement mapping setup
+        // -------------------------
+        dispShader.use();
+        dispShader.setMat4("projection", projection);
+        dispShader.setMat4("view", view);
+        dispShader.setMat4("model", model);
+        dispShader.setVec3("viewPos", camera.Position);
+        dispShader.setVec3("lightPos", lightPos);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, normalMap);
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_2D, displacementMap);
+        renderPlane();
+        glDrawArrays(GL_PATCHES, 0, 4);
         // render light source (simply re-renders a smaller plane at the light's position for debugging/visualization)
-        model = glm::mat4(1.0f);
+        /*model = glm::mat4(1.0f);
         model = glm::translate(model, lightPos);
         model = glm::scale(model, glm::vec3(0.1f));
         shader.setMat4("model", model);
-        renderQuad();
+        renderQuad();*/
 
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
         // -------------------------------------------------------------------------------
@@ -147,6 +191,52 @@ int main()
 
     glfwTerminate();
     return 0;
+}
+
+// renders a 1x1 quad in NDC with manually calculated tangent vectors
+// ------------------------------------------------------------------
+unsigned int planeVAO = 0;
+unsigned int planeVBO;
+void renderPlane()
+{
+    if (planeVAO == 0)
+    {
+        // positions
+        glm::vec3 pos1(-1.0f, -1.0f, 0.0f);
+        glm::vec3 pos2(1.0f, -1.0f, 0.0f);
+        glm::vec3 pos3(-1.0f, 1.0f, 0.0f);
+        glm::vec3 pos4(1.0f, 1.0f, 0.0f);
+        // texture coordinates
+        glm::vec2 uv1(0.0f, 0.0f);
+        glm::vec2 uv2(1.0f, 0.0f);
+        glm::vec2 uv3(0.0f, 1.0f);
+        glm::vec2 uv4(1.0f, 1.0f);
+        // normal vector
+        glm::vec3 nm(0.0f, 0.0f, 1.0f);
+
+        float planeVertices[] = {
+            // positions            // normal         // texcoords 
+            pos1.x, pos1.y, pos1.z, nm.x, nm.y, nm.z, uv1.x, uv1.y, 
+            pos2.x, pos2.y, pos2.z, nm.x, nm.y, nm.z, uv2.x, uv2.y,
+            pos3.x, pos3.y, pos3.z, nm.x, nm.y, nm.z, uv3.x, uv3.y, 
+            pos4.x, pos4.y, pos4.z, nm.x, nm.y, nm.z, uv4.x, uv4.y
+        };
+        // configure plane VAO
+        glGenVertexArrays(1, &planeVAO);
+        glGenBuffers(1, &planeVBO);
+        glBindVertexArray(planeVAO);
+        glBindBuffer(GL_ARRAY_BUFFER, planeVBO);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(planeVertices), &planeVertices, GL_STATIC_DRAW);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
+        glEnableVertexAttribArray(2);
+        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
+    }
+    glBindVertexArray(planeVAO);
+    //glDrawArrays(GL_TRIANGLES, 0, 6);
+    //glBindVertexArray(0);
 }
 
 // renders a 1x1 quad in NDC with manually calculated tangent vectors
@@ -237,8 +327,8 @@ void renderQuad()
         glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(11 * sizeof(float)));
     }
     glBindVertexArray(quadVAO);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
-    glBindVertexArray(0);
+    //glDrawArrays(GL_TRIANGLES, 0, 6);
+    //glBindVertexArray(0);
 }
 
 // process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
@@ -256,6 +346,15 @@ void processInput(GLFWwindow *window)
         camera.ProcessKeyboard(LEFT, deltaTime);
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
         camera.ProcessKeyboard(RIGHT, deltaTime);
+
+    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS && !spacePressed)
+    {
+		spacePressed = true;
+	}
+    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_RELEASE)
+    {
+		spacePressed = false;
+	}
 }
 
 // glfw: whenever the window size changed (by OS or user resize) this callback function executes

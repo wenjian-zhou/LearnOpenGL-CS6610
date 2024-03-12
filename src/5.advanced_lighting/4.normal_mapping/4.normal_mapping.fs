@@ -23,7 +23,7 @@ void main()
     normal = normalize(normal * 2.0 - 1.0);  // this normal is in tangent space
    
     // get diffuse color
-    vec3 color = texture(diffuseMap, fs_in.TexCoords).rgb;
+    vec3 color = vec3(0.7, 0.7, 0.7);
     // ambient
     vec3 ambient = 0.1 * color;
     // diffuse
@@ -38,4 +38,5 @@ void main()
 
     vec3 specular = vec3(0.2) * spec;
     FragColor = vec4(ambient + diffuse + specular, 1.0);
+    //FragColor = vec4(specular, 1.0);
 }
