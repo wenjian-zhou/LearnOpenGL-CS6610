@@ -9,9 +9,6 @@ in VS_OUT {
     vec3 TangentFragPos;
 } fs_in;
 
-uniform sampler2D diffuseMap;
-uniform sampler2D normalMap;
-
 uniform vec3 lightPos;
 uniform vec3 viewPos;
 

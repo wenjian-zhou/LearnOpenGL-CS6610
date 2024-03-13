@@ -83,11 +83,20 @@ int main(int argc, char** argv)
     Shader shader("4.normal_mapping.vs", "4.normal_mapping.fs");
     Shader geoShader("tesselation.vs", "tesselation.fs", "tesselation.gs");
     Shader dispShader("dis.vs", "dis.fs", nullptr, "dis.tcs", "dis.tes");
+    Shader dispGeoShader("dis.vs", "dis_show.fs", "dis.gs", "dis.tcs", "dis_show.tes");
     // load textures
     // -------------
     unsigned int diffuseMap = loadTexture(FileSystem::getPath("resources/textures/block.png").c_str());
-    unsigned int normalMap  = loadTexture(FileSystem::getPath("resources/textures/teapot_normal.png").c_str());
-    unsigned int displacementMap = loadTexture(FileSystem::getPath("resources/textures/teapot_disp.png").c_str());
+    unsigned int normalMap = 0, displacementMap = 0;
+    if (argc == 2)
+    {
+        normalMap = loadTexture(FileSystem::getPath(argv[1]).c_str());
+    }
+    else if (argc == 3)
+    {
+        normalMap = loadTexture(FileSystem::getPath(argv[1]).c_str());
+        displacementMap = loadTexture(FileSystem::getPath(argv[2]).c_str());
+    }
 
     // shader configuration
     // --------------------
@@ -95,13 +104,12 @@ int main(int argc, char** argv)
     shader.setInt("diffuseMap", 0);
     shader.setInt("normalMap", 1);
 
-    geoShader.use();
-    geoShader.setInt("diffuseMap", 0);
-    geoShader.setInt("normalMap", 1);
-
     dispShader.use();
     dispShader.setInt("normalMap", 1);
     dispShader.setInt("heightMap", 2);
+
+    dispGeoShader.use();
+    dispGeoShader.setInt("normalMap", 1);
     // lighting info
     // -------------
     glm::vec3 lightPos(0.5f, 0.0f, 0.5f);
@@ -134,48 +142,65 @@ int main(int argc, char** argv)
         // render normal-mapped quad       
         glm::mat4 model = glm::mat4(1.0f);
         model = glm::rotate(model, glm::radians(180.f), glm::normalize(glm::vec3(0.0, 0.0, 1.0))); // rotate the quad to show normal mapping from multiple directions
-        /*shader.use();
-        shader.setMat4("projection", projection);
-        shader.setMat4("view", view);
-        shader.setMat4("model", model);
-        shader.setVec3("viewPos", camera.Position);
-        shader.setVec3("lightPos", lightPos);
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, diffuseMap);
-        glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, normalMap);
-        renderQuad();
-        glDrawArrays(GL_TRIANGLES, 0, 6);
+        
 
-        if (spacePressed)
+        if (argc == 2)
         {
-            geoShader.use();
-            geoShader.setMat4("projection", projection);
-            geoShader.setMat4("view", view);
-            geoShader.setMat4("model", model);
-            geoShader.setVec3("viewPos", camera.Position);
-            geoShader.setVec3("lightPos", lightPos);
+            shader.use();
+            shader.setMat4("projection", projection);
+            shader.setMat4("view", view);
+            shader.setMat4("model", model);
+            shader.setVec3("viewPos", camera.Position);
+            shader.setVec3("lightPos", lightPos);
             glActiveTexture(GL_TEXTURE0);
             glBindTexture(GL_TEXTURE_2D, diffuseMap);
             glActiveTexture(GL_TEXTURE1);
             glBindTexture(GL_TEXTURE_2D, normalMap);
+            renderQuad();
             glDrawArrays(GL_TRIANGLES, 0, 6);
-        }*/
 
-        // displacement mapping setup
-        // -------------------------
-        dispShader.use();
-        dispShader.setMat4("projection", projection);
-        dispShader.setMat4("view", view);
-        dispShader.setMat4("model", model);
-        dispShader.setVec3("viewPos", camera.Position);
-        dispShader.setVec3("lightPos", lightPos);
-        glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, normalMap);
-        glActiveTexture(GL_TEXTURE2);
-        glBindTexture(GL_TEXTURE_2D, displacementMap);
-        renderPlane();
-        glDrawArrays(GL_PATCHES, 0, 4);
+            if (spacePressed)
+            {
+                geoShader.use();
+                geoShader.setMat4("projection", projection);
+                geoShader.setMat4("view", view);
+                geoShader.setMat4("model", model);
+                geoShader.setVec3("viewPos", camera.Position);
+                geoShader.setVec3("lightPos", lightPos);
+                glDrawArrays(GL_TRIANGLES, 0, 6);
+            }
+        }
+        else if (argc == 3)
+        {
+            // displacement mapping setup
+            // -------------------------
+            dispShader.use();
+            dispShader.setMat4("projection", projection);
+            dispShader.setMat4("view", view);
+            dispShader.setMat4("model", model);
+            dispShader.setVec3("viewPos", camera.Position);
+            dispShader.setVec3("lightPos", lightPos);
+            glActiveTexture(GL_TEXTURE1);
+            glBindTexture(GL_TEXTURE_2D, normalMap);
+            glActiveTexture(GL_TEXTURE2);
+            glBindTexture(GL_TEXTURE_2D, displacementMap);
+            renderPlane();
+            glDrawArrays(GL_PATCHES, 0, 4);
+
+            if (spacePressed)
+            {
+                dispGeoShader.use();
+                dispGeoShader.setMat4("projection", projection);
+                dispGeoShader.setMat4("view", view);
+                dispGeoShader.setMat4("model", model);
+                dispGeoShader.setVec3("viewPos", camera.Position);
+                dispGeoShader.setVec3("lightPos", lightPos);
+                glActiveTexture(GL_TEXTURE1);
+                glBindTexture(GL_TEXTURE_2D, normalMap);
+                glDrawArrays(GL_PATCHES, 0, 4);
+            }
+        }
+       
         // render light source (simply re-renders a smaller plane at the light's position for debugging/visualization)
         /*model = glm::mat4(1.0f);
         model = glm::translate(model, lightPos);

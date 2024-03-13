@@ -23,7 +23,7 @@ uniform vec3 viewPos;
 void main()
 {
     vec3 offset = normalize(viewPos - vec3(model * vec4(aPos, 1.0)));
-    vec3 newPos = aPos + offset * 0.005;
+    vec3 newPos = aPos + vec3(0.0, 0.0, 1.0) * 0.005;
 
     vs_out.FragPos = vec3(model * vec4(newPos, 1.0));   
     vs_out.TexCoords = aTexCoords;

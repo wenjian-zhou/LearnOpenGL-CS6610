@@ -38,5 +38,5 @@ void main()
 
     vec3 specular = vec3(0.2) * spec;
     FragColor = vec4(ambient + diffuse + specular, 1.0);
-    //FragColor = vec4(specular, 1.0);
+    //FragColor = vec4(normalize(specular), 1.0);
 }
