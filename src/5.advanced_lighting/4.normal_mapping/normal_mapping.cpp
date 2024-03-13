@@ -20,11 +20,13 @@ void processInput(GLFWwindow *window);
 unsigned int loadTexture(const char *path);
 void renderQuad();
 void renderPlane();
+void renderDebugQuad();
 
 // settings
 const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
 bool spacePressed = false;
+float tessLevel = 8.0f;
 
 // camera
 Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
@@ -84,6 +86,9 @@ int main(int argc, char** argv)
     Shader geoShader("tesselation.vs", "tesselation.fs", "tesselation.gs");
     Shader dispShader("dis.vs", "dis.fs", nullptr, "dis.tcs", "dis.tes");
     Shader dispGeoShader("dis.vs", "dis_show.fs", "dis.gs", "dis.tcs", "dis_show.tes");
+    Shader shadowShader("dis.vs", "dis_shadow.fs", nullptr, "dis.tcs", "dis_shadow.tes");
+    Shader debugShader("debug_quad.vs", "debug_quad.fs");
+    
     // load textures
     // -------------
     unsigned int diffuseMap = loadTexture(FileSystem::getPath("resources/textures/block.png").c_str());
@@ -98,6 +103,29 @@ int main(int argc, char** argv)
         displacementMap = loadTexture(FileSystem::getPath(argv[2]).c_str());
     }
 
+    // configure depth map FBO
+    // -----------------------
+    const unsigned int SHADOW_WIDTH = 1024, SHADOW_HEIGHT = 1024;
+    unsigned int depthMapFBO;
+    glGenFramebuffers(1, &depthMapFBO);
+    // create depth texture
+    unsigned int depthMap;
+    glGenTextures(1, &depthMap);
+    glBindTexture(GL_TEXTURE_2D, depthMap);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+    float borderColor[] = { 1.0, 1.0, 1.0, 1.0 };
+    glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
+    // attach depth texture as FBO's depth buffer
+    glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthMap, 0);
+    glDrawBuffer(GL_NONE);
+    glReadBuffer(GL_NONE);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
     // shader configuration
     // --------------------
     shader.use();
@@ -107,12 +135,20 @@ int main(int argc, char** argv)
     dispShader.use();
     dispShader.setInt("normalMap", 1);
     dispShader.setInt("heightMap", 2);
+    dispShader.setInt("shadowMap", 3);
 
     dispGeoShader.use();
     dispGeoShader.setInt("normalMap", 1);
+    dispGeoShader.setInt("heightMap", 2);
+
+    shadowShader.use();
+    shadowShader.setInt("heightMap", 2);
+
+    debugShader.use();
+    debugShader.setInt("depthMap", 3);
     // lighting info
     // -------------
-    glm::vec3 lightPos(0.5f, 0.0f, 0.5f);
+    glm::vec3 lightPos(1.0f, 1.0f, 1.0f);
 
     glPatchParameteri(GL_PATCH_VERTICES, 4);
 
@@ -142,7 +178,7 @@ int main(int argc, char** argv)
         // render normal-mapped quad       
         glm::mat4 model = glm::mat4(1.0f);
         model = glm::rotate(model, glm::radians(180.f), glm::normalize(glm::vec3(0.0, 0.0, 1.0))); // rotate the quad to show normal mapping from multiple directions
-        
+        //model = glm::scale(model, glm::vec3(0.5));
 
         if (argc == 2)
         {
@@ -158,6 +194,7 @@ int main(int argc, char** argv)
             glBindTexture(GL_TEXTURE_2D, normalMap);
             renderQuad();
             glDrawArrays(GL_TRIANGLES, 0, 6);
+            glBindVertexArray(0);
 
             if (spacePressed)
             {
@@ -167,25 +204,59 @@ int main(int argc, char** argv)
                 geoShader.setMat4("model", model);
                 geoShader.setVec3("viewPos", camera.Position);
                 geoShader.setVec3("lightPos", lightPos);
+                renderQuad();
                 glDrawArrays(GL_TRIANGLES, 0, 6);
+                glBindVertexArray(0);
             }
         }
         else if (argc == 3)
         {
+            // render depth of scene to texture (from light's perspective)
+            // --------------------------------------------------------------
+            glm::mat4 lightProjection, lightView;
+            glm::mat4 lightSpaceMatrix;
+            float near_plane = 0.1f, far_plane = 7.5f;
+            lightProjection = glm::ortho(-1.5f, 1.5f, -1.5f, 1.5f, near_plane, far_plane);
+            lightView = glm::lookAt(lightPos, glm::vec3(0.0f), glm::vec3(0.0, 1.0, 0.0));
+            lightSpaceMatrix = lightProjection * lightView;
+            // render scene from light's point of view
+            shadowShader.use();
+            shadowShader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
+            shadowShader.setMat4("model", model);
+            shadowShader.setFloat("tessLevel", tessLevel);
+            glActiveTexture(GL_TEXTURE2);
+            glBindTexture(GL_TEXTURE_2D, displacementMap);
+
+            glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
+            glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
+            glClear(GL_DEPTH_BUFFER_BIT);
+            renderPlane();
+            glDrawArrays(GL_PATCHES, 0, 4);
+            glBindVertexArray(0);
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+            glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
             // displacement mapping setup
             // -------------------------
             dispShader.use();
             dispShader.setMat4("projection", projection);
             dispShader.setMat4("view", view);
             dispShader.setMat4("model", model);
+            dispShader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
             dispShader.setVec3("viewPos", camera.Position);
             dispShader.setVec3("lightPos", lightPos);
+            dispShader.setFloat("tessLevel", tessLevel);
             glActiveTexture(GL_TEXTURE1);
             glBindTexture(GL_TEXTURE_2D, normalMap);
             glActiveTexture(GL_TEXTURE2);
             glBindTexture(GL_TEXTURE_2D, displacementMap);
+            glActiveTexture(GL_TEXTURE3);
+            glBindTexture(GL_TEXTURE_2D, depthMap);
             renderPlane();
             glDrawArrays(GL_PATCHES, 0, 4);
+            glBindVertexArray(0);
 
             if (spacePressed)
             {
@@ -193,12 +264,20 @@ int main(int argc, char** argv)
                 dispGeoShader.setMat4("projection", projection);
                 dispGeoShader.setMat4("view", view);
                 dispGeoShader.setMat4("model", model);
-                dispGeoShader.setVec3("viewPos", camera.Position);
-                dispGeoShader.setVec3("lightPos", lightPos);
-                glActiveTexture(GL_TEXTURE1);
-                glBindTexture(GL_TEXTURE_2D, normalMap);
+                dispGeoShader.setFloat("tessLevel", tessLevel);
+                renderPlane();
                 glDrawArrays(GL_PATCHES, 0, 4);
+                glBindVertexArray(0);
             }
+
+            // render Depth map to quad for visual debugging
+            // ---------------------------------------------
+            debugShader.use();
+            debugShader.setFloat("near_plane", near_plane);
+            debugShader.setFloat("far_plane", far_plane);
+            glActiveTexture(GL_TEXTURE3);
+            glBindTexture(GL_TEXTURE_2D, depthMap);
+            //renderDebugQuad();
         }
        
         // render light source (simply re-renders a smaller plane at the light's position for debugging/visualization)
@@ -216,6 +295,37 @@ int main(int argc, char** argv)
 
     glfwTerminate();
     return 0;
+}
+
+// renderQuad() renders a 1x1 XY quad in NDC
+// -----------------------------------------
+unsigned int dequadVAO = 0;
+unsigned int dequadVBO;
+void renderDebugQuad()
+{
+    if (dequadVAO == 0)
+    {
+        float dequadVertices[] = {
+            // positions        // texture Coords
+            -1.0f,  1.0f, 0.0f, 0.0f, 1.0f,
+            -1.0f, -1.0f, 0.0f, 0.0f, 0.0f,
+             1.0f,  1.0f, 0.0f, 1.0f, 1.0f,
+             1.0f, -1.0f, 0.0f, 1.0f, 0.0f,
+        };
+        // setup plane VAO
+        glGenVertexArrays(1, &dequadVAO);
+        glGenBuffers(1, &dequadVBO);
+        glBindVertexArray(dequadVAO);
+        glBindBuffer(GL_ARRAY_BUFFER, dequadVBO);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(dequadVertices), &dequadVertices, GL_STATIC_DRAW);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+    }
+    glBindVertexArray(dequadVAO);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    glBindVertexArray(0);
 }
 
 // renders a 1x1 quad in NDC with manually calculated tangent vectors
@@ -378,7 +488,21 @@ void processInput(GLFWwindow *window)
 	}
     if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_RELEASE)
     {
-		spacePressed = false;
+        spacePressed = false;
+	}
+
+    // use left and right arrow key to change tessellation level
+    if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
+    {
+            tessLevel += 1.0f;
+            if (tessLevel > 64.0f)
+                tessLevel = 64.0f;
+	}
+    if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
+    {
+		    tessLevel -= 1.0f;
+            if (tessLevel < 8.0f)
+                tessLevel = 8.0f;
 	}
 }
 

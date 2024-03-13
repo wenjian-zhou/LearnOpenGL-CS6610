@@ -10,16 +10,18 @@ in vec3 Normal[];
 out vec3 tcNormal[];
 out vec2 TextureCoord[];
 
+uniform float tessLevel;
+
 void main()
 {
     gl_out[gl_InvocationID].gl_Position = gl_in[gl_InvocationID].gl_Position;
     TextureCoord[gl_InvocationID] = TexCoords[gl_InvocationID];
     tcNormal[gl_InvocationID] = Normal[gl_InvocationID];
-    gl_TessLevelOuter[0] = 16*8.0;
-    gl_TessLevelOuter[1] = 16*8.0;
-    gl_TessLevelOuter[2] = 16*8.0;
-    gl_TessLevelOuter[3] = 16*8.0;
+    gl_TessLevelOuter[0] = tessLevel;
+    gl_TessLevelOuter[1] = tessLevel;
+    gl_TessLevelOuter[2] = tessLevel;
+    gl_TessLevelOuter[3] = tessLevel;
 
-    gl_TessLevelInner[0] = 16*8.0;
-    gl_TessLevelInner[1] = 16*8.0;
+    gl_TessLevelInner[0] = tessLevel;
+    gl_TessLevelInner[1] = tessLevel;
 }

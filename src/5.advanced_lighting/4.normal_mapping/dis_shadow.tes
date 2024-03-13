@@ -3,14 +3,7 @@ layout(quads, fractional_odd_spacing, ccw) in;
 
 uniform sampler2D heightMap;
 uniform mat4 model;
-uniform mat4 view;
-uniform mat4 projection;
 uniform mat4 lightSpaceMatrix;
-
-out TES_OUT {
-    vec3 FragPos;
-    vec4 FragPosLightSpace;
-} tes_out;
 
 in vec3 tcNormal[];
 in vec2 TextureCoord[];
@@ -18,8 +11,6 @@ out vec2 teTexCoord;
 out vec3 tePosition;
 out float Height;
 out mat3 TBN;
-out mat3 normalMat;
-out vec3 mNormal;
 
 vec2 interpolate_txc(float u, float v)
 {
@@ -103,8 +94,6 @@ void main()
     vec2 deltaUV1 = uv2 - uv1;
     vec2 deltaUV2 = uv3 - uv1;
 
-    mNormal = normalize(cross(edge1, edge2));
-
     float f = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y);
 
     vec3 tangent = vec3(0.0);
@@ -127,9 +116,5 @@ void main()
 
     TBN = transpose(mat3(T, B, N)); 
 
-    tes_out.FragPos = vec3(model * p);
-    normalMat = normalMatrix;
-    tes_out.FragPosLightSpace = lightSpaceMatrix * vec4(tes_out.FragPos, 1.0);
-
-    gl_Position = projection * view * model * p;
+    gl_Position = lightSpaceMatrix * model * p;
 }
